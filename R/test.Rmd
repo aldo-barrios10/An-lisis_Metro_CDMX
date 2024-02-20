@@ -1,0 +1,133 @@
+---
+
+output: html_notebook
+---
+
+## **Análisis del Sistema de Transporte Colectivo Metro de la Ciudad de México antes y durante la pandemia de COVID-19**
+
+### **Hipótesis y fuentes**
+
+La pandemia paralizó las ciudades durante varios meses, dejando muchos servicios suspendidos, y México no fue la excepción, reduciendo significativamente el tránsito de personas en la calle y, por ende, en el transporte público. De esta manera, cabe preguntarse:
+
+- ¿Qué desempeño tuvo el sistema Metro de la Ciudad de México y cómo se vio afectado durante y después de la pandemia del COVID-19? 
+
+- ¿Algún otro factor se vio implicado en el desempeño del Metro? 
+
+Para realizar esta tarea, es necesario recolectar datos tanto de la afluencia en el Metro, como los casos confirmados de COVID-19. Las fuentes utilizadas para el análisis fueron las siguientes:
+
+Portal del gobierno de la Ciudad de México(Afluencia del Metro): https://datos.cdmx.gob.mx/dataset/afluencia-diaria-del-metro-cdmx
+
+Conahcyt (Informe de COVID-19 en periodo 2020-2023):  https://datos.covid-19.conacyt.mx/#DownZCSV
+
+
+### **Comienzo de análisis**
+
+Para comenzar a responder las preguntas planteadas, es necesario preparar las herramientas. En esta ocasión se usará R y sus diversas herramientas para poder responder las preguntas iniciales. 
+
+
+```{r, echo=FALSE}
+
+library(ggplot2, quietly = TRUE)
+
+library(dplyr, quietly = TRUE, exclude = c("filter", "lag", "intersect", "setdiff", "setequal", "union"))
+
+library(gridExtra, quietly = TRUE, exclude = c("combine"))
+
+metro <- read.csv("../dataset/afluencia_2013-2023.csv")
+
+covid <- read.csv("../dataset/covid_cdmx_2020-2023.csv")
+
+metro <- metro %>%
+  group_by(anio) %>%
+  summarize(afluencia = sum(afluencia))
+
+
+covid$anio <- format(as.Date(covid$fecha, format = "%d/%m/%Y"), "%Y")
+
+covid <- covid %>%
+  group_by(anio) %>%
+  summarise(casos = sum(casos))
+
+covid$anio <- as.integer(covid$anio)
+
+datos_comparativos <- left_join(metro, covid, by = "anio")
+
+df_long <- tidyr::pivot_longer(datos_comparativos, cols =
+                                 c("afluencia", "casos"),
+                               names_to = "Variable", values_to = "Valor")
+
+gr <- ggplot(df_long, aes(x = as.factor(anio), y = Valor, 
+                          group = Variable, color = Variable)) +
+  geom_line(linewidth = 1, linetype = "solid", na.rm = TRUE) +
+  geom_point(na.rm = TRUE) +
+  geom_text(na.rm = TRUE, aes(label = Valor), 
+            position = position_dodge(width = 0.5), vjust = -0.5) +
+            labs(title = "Comparación de Afluencia en el Metro de CDMX y Casos Positivos de COVID-19 en CDMX",
+            x = "Año",
+            y = "Afluencia y Casos Positivos",
+            color = "Datos") +
+  theme_minimal() +
+  theme(plot.title = element_text(size = 15, hjust = 0.5), 
+        plot.subtitle = element_text(size = 22, hjust = 0.5)) +
+  scale_y_continuous(labels = scales::comma) +
+  facet_wrap(~Variable, ncol = 1, scales = "free_y")
+
+
+```
+
+### **Gráfica de comparación general**
+En esta gráfica podemos ver respresentada la afluencia del Metro en los ultimos 10 años y los casos de COVID-19 en los años de la pandemia.
+
+```{r, echo=FALSE, dpi=300, fig.width=12, fig.height=12}
+plot(gr)
+```
+
+### **Análisis individual**
+
+```{r, echo=FALSE, dpi=300, fig.width=12, fig.height=12}
+custom_params <- theme(
+  axis.text.x = element_text(),
+  axis.text.y = element_text(),
+  axis.ticks = element_blank(),
+  axis.title = element_text(),
+  axis.line.x = element_line(),
+  axis.line.y = element_line(),
+  panel.grid.major = element_line(),
+  panel.grid.minor = element_blank(),
+  panel.border = element_blank(),
+  panel.background = element_blank(),
+  strip.background = element_blank(),
+  strip.placement = "inside"
+)
+
+metro <- read.csv("../dataset/afluencia_2013-2023.csv")
+
+covid <- read.csv("../dataset/covid_cdmx_2020-2023.csv")
+
+metro <- metro %>%
+  group_by(fecha, linea) %>%
+  summarize(afluencia = sum(afluencia))
+
+metro$fecha <- as.Date(metro$fecha)
+
+p <- ggplot(metro, aes(x = fecha, y = afluencia, fill = linea)) +
+  geom_area(alpha = 0.5) +
+  facet_wrap(~linea, ncol = 3) +
+  theme_minimal() +
+  custom_params +
+  theme(
+    strip.text = element_text(hjust = 0.5),
+    strip.text.y = element_blank(),
+    strip.text.x = element_text(size = 12, color = 'black'),
+    axis.title.y = element_text(size = 12, color = 'black'),
+    axis.title.x = element_blank(),
+    legend.position = 'none'
+  ) +
+  labs(
+    title = 'Afluencia del sistema Metro por línea (2020-2023)',
+    subtitle = '',
+    caption = ''
+  )
+
+plot(p)
+```
